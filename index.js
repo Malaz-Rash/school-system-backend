@@ -33,10 +33,14 @@ const upload = multer({ storage: storage });
 app.use('/uploads', express.static('uploads'));
 
 // الاتصال بـ MongoDB
-mongoose.connect('mongodb://localhost/school-system', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => console.log('Connected to MongoDB'))
+//mongoose.connect('mongodb+srv://admin:HamzaLoza%4025102023@cluster0.65macnn.mongodb.net/school-system?retryWrites=true&w=majority&appName=Cluster0', {
+//}).then(() => console.log('Connected to MongoDB'))
+  //.catch(err => console.error('Failed to connect to MongoDB:', err));
+
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost/school-system';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('Failed to connect to MongoDB:', err));
 
 // Middleware للتحقق من JWT
