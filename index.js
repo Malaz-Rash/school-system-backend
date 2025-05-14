@@ -43,6 +43,7 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
+    console.log('No token provided in Authorization header');
     return res.status(401).json({ error: 'Access denied, no token provided' });
   }
   try {
@@ -50,6 +51,7 @@ const authenticateToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
+    console.log('Invalid token:', error.message);
     res.status(403).json({ error: 'Invalid token' });
   }
 };
@@ -57,6 +59,7 @@ const authenticateToken = (req, res, next) => {
 // Middleware للتحقق من دور DepartmentHead
 const restrictToDepartmentHead = (req, res, next) => {
   if (req.user.role !== 'DepartmentHead') {
+    console.log('Access denied: User role is not DepartmentHead');
     return res.status(403).json({ error: 'Access denied, only DepartmentHead allowed' });
   }
   next();
@@ -65,6 +68,7 @@ const restrictToDepartmentHead = (req, res, next) => {
 // Middleware للتحقق من دور Admin أو DepartmentHead
 const restrictToAdminOrDepartmentHead = (req, res, next) => {
   if (req.user.role !== 'Admin' && req.user.role !== 'DepartmentHead') {
+    console.log('Access denied: User role is neither Admin nor DepartmentHead');
     return res.status(403).json({ error: 'Access denied, only Admin or DepartmentHead allowed' });
   }
   next();
@@ -73,6 +77,7 @@ const restrictToAdminOrDepartmentHead = (req, res, next) => {
 // Middleware للتحقق من دور Registrar
 const restrictToRegistrar = (req, res, next) => {
   if (req.user.role !== 'Registrar') {
+    console.log('Access denied: User role is not Registrar');
     return res.status(403).json({ error: 'Access denied, only Registrar allowed' });
   }
   next();
@@ -234,10 +239,12 @@ app.get('/api/applications/:id', authenticateToken, restrictToAdminOrDepartmentH
 
 // API لإنشاء امتحان جديد (محمي بـ JWT، مقيد بـ DepartmentHead)
 app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array('images'), async (req, res) => {
+  console.log('Received POST request to /api/exams');
   try {
     const { subject, division, stage, level } = req.body;
     const questions = req.body.questions ? JSON.parse(req.body.questions) : [];
 
+    console.log('User data from token:', req.user);
     if (req.user.department !== subject) {
       console.log(`Access denied: User department (${req.user.department}) does not match exam subject (${subject})`);
       return res.status(403).json({ error: 'You can only create exams for your department' });
