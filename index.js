@@ -257,12 +257,13 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
+    let fileIndex = 0;
     questions.forEach((question, index) => {
       question.order = index + 1; // إضافة الترتيب
-      const fileForQuestion = files.find(file => file.fieldname === `images[${index}]`);
-      if (fileForQuestion) {
-        question.image = `/uploads/${fileForQuestion.filename}`;
+      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
+        question.image = `/uploads/${files[fileIndex].filename}`;
         console.log(`Image added to question ${index + 1}: ${question.image}`);
+        fileIndex++;
       } else {
         question.image = '';
         console.log(`No image for question ${index + 1}`);
@@ -274,7 +275,7 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log(`Exam created successfully with ID: ${exam._id}`);
     res.status(201).json({ message: 'Exam created successfully', exam });
   } catch (error) {
-    console.error('Error creating exam:', error);
+    console.error('Detailed error creating exam:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });
@@ -464,12 +465,13 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
+    let fileIndex = 0;
     questions.forEach((question, index) => {
       question.order = index + 1;
-      const fileForQuestion = files.find(file => file.fieldname === `images[${index}]`);
-      if (fileForQuestion) {
-        question.image = `/uploads/${fileForQuestion.filename}`;
+      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
+        question.image = `/uploads/${files[fileIndex].filename}`;
         console.log(`Image updated for question ${index + 1}: ${question.image}`);
+        fileIndex++;
       } else if (!question.image) {
         question.image = '';
         console.log(`No image for question ${index + 1}`);
@@ -486,7 +488,7 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     console.log(`Exam ${id} updated successfully`);
     res.json({ message: 'Exam updated successfully', exam });
   } catch (error) {
-    console.error('Error updating exam:', error);
+    console.error('Detailed error updating exam:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });
