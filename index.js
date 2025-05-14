@@ -33,14 +33,10 @@ const upload = multer({ storage: storage });
 app.use('/uploads', express.static('uploads'));
 
 // الاتصال بـ MongoDB
-//mongoose.connect('mongodb+srv://admin:HamzaLoza%4025102023@cluster0.65macnn.mongodb.net/school-system?retryWrites=true&w=majority&appName=Cluster0', {
-//}).then(() => console.log('Connected to MongoDB'))
-  //.catch(err => console.error('Failed to connect to MongoDB:', err));
-
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost/school-system';
-  mongoose.connect(MONGODB_URI)
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('Failed to connect to MongoDB:', err));
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost/school-system';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Failed to connect to MongoDB:', err));
 
 // Middleware للتحقق من JWT
 const authenticateToken = (req, res, next) => {
@@ -84,7 +80,7 @@ const restrictToRegistrar = (req, res, next) => {
 
 // API لإنشاء مستخدم جديد
 app.post('/api/users/register', async (req, res) => {
-  console.log('Received POST request to /api/users/register:', req.body); // تسجيل إضافي للتأكد من الطلب
+  console.log('Received POST request to /api/users/register:', req.body);
   const { username, password, role, department, division } = req.body;
   try {
     const existingUser = await User.findOne({ username });
@@ -193,13 +189,11 @@ app.get('/api/applications', authenticateToken, restrictToAdminOrDepartmentHead,
     const applications = await Application.find().populate('studentId').lean();
     console.log(`Retrieved ${applications.length} applications`);
 
-    // إذا كان المستخدم DepartmentHead، نرجع فقط الطلبات التي تحتوي على نتائج قسمه وتتطابق مع القسم الدراسي
     if (req.user.role === 'DepartmentHead') {
       const filteredApplications = applications.filter(app => {
         const relevantExams = app.exams?.filter(
           exam => exam.subject === req.user.department
         );
-        // تسجيل لتتبع الطلبات وحالة seenByDepartmentHead
         console.log(`Application ${app._id} - Relevant Exams:`, relevantExams);
         return relevantExams && relevantExams.length > 0 && app.division === req.user.division;
       });
@@ -209,7 +203,6 @@ app.get('/api/applications', authenticateToken, restrictToAdminOrDepartmentHead,
       });
     }
 
-    // إذا كان المستخدم Admin، نرجع جميع الطلبات
     res.json({
       message: 'Applications retrieved successfully',
       applications
@@ -264,13 +257,12 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    let fileIndex = 0; // لتتبع الملفات المرفوعة
     questions.forEach((question, index) => {
-      // نتحقق مما إذا كان هناك ملف مرفوع لهذا السؤال
-      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
-        question.image = `/uploads/${files[fileIndex].filename}`;
+      question.order = index + 1; // إضافة الترتيب
+      const fileForQuestion = files.find(file => file.fieldname === `images[${index}]`);
+      if (fileForQuestion) {
+        question.image = `/uploads/${fileForQuestion.filename}`;
         console.log(`Image added to question ${index + 1}: ${question.image}`);
-        fileIndex++; // الانتقال إلى الملف التالي
       } else {
         question.image = '';
         console.log(`No image for question ${index + 1}`);
@@ -292,17 +284,19 @@ app.get('/api/exams', async (req, res) => {
   const { division, stage, level, subject } = req.query;
   try {
     if (division && stage && level && subject) {
-      // جلب أحدث امتحان بناءً على المعايير (ترتيب تنازلي حسب تاريخ الإنشاء)
       const exam = await Exam.findOne({ division, stage, level, subject })
-        .sort({ _id: -1 }); // ترتيب تنازلي للحصول على أحدث امتحان
+        .sort({ _id: -1 });
       if (!exam) {
         return res.status(404).json({ error: 'Exam not found' });
       }
+      exam.questions.sort((a, b) => a.order - b.order);
       console.log(`Exam retrieved successfully for ${subject} (${division}, ${stage}, ${level})`);
       res.json({ message: 'Exam retrieved successfully', exam });
     } else {
-      // جلب جميع الامتحانات
       const exams = await Exam.find().sort({ _id: -1 });
+      exams.forEach(exam => {
+        exam.questions.sort((a, b) => a.order - b.order);
+      });
       console.log(`Retrieved ${exams.length} exams`);
       res.json({ message: 'Exams retrieved successfully', exams });
     }
@@ -320,7 +314,6 @@ app.delete('/api/exams/:id', authenticateToken, restrictToDepartmentHead, async 
     if (!exam) {
       return res.status(404).json({ error: 'Exam not found' });
     }
-    // التحقق من أن الامتحان يخص قسم المستخدم
     if (req.user.department !== exam.subject) {
       return res.status(403).json({ error: 'You can only delete exams for your department' });
     }
@@ -338,25 +331,23 @@ app.post('/api/applications/:id/submit-exam', async (req, res) => {
   const { id } = req.params;
   const { examId, answers } = req.body;
   try {
-    // التحقق من وجود الطلب
     const application = await Application.findById(id);
     if (!application) {
       return res.status(404).json({ error: 'Application not found' });
     }
-    // التحقق من وجود الامتحان
     const exam = await Exam.findById(examId);
     if (!exam) {
       return res.status(404).json({ error: 'Exam not found' });
     }
-    console.log('Exam questions before processing:', exam.questions); // تسجيل الأسئلة قبل المعالجة
-    // تصحيح الإجابات
+    console.log('Exam questions before processing:', exam.questions);
+    exam.questions.sort((a, b) => a.order - b.order);
     let score = 0;
     const totalQuestions = exam.questions.length;
     const results = exam.questions.map((question, index) => {
       const studentAnswer = answers[index] || '';
       const isCorrect = studentAnswer === question.correctAnswer;
       if (isCorrect) score++;
-      console.log(`Question ${index + 1} image path:`, question.image); // تسجيل مسار الصورة لكل سؤال
+      console.log(`Question ${index + 1} image path:`, question.image);
       return {
         question: question.question,
         image: question.image || '',
@@ -365,10 +356,8 @@ app.post('/api/applications/:id/submit-exam', async (req, res) => {
         isCorrect
       };
     });
-    console.log('Results after processing:', results); // تسجيل النتائج بعد المعالجة
-    // حساب النسبة المئوية للدرجة
+    console.log('Results after processing:', results);
     const percentageScore = (score / totalQuestions) * 100;
-    // تحديث حقل exams في الطلب
     const examResult = {
       subject: exam.subject,
       score: percentageScore,
@@ -380,7 +369,6 @@ app.post('/api/applications/:id/submit-exam', async (req, res) => {
     application.exams.push(examResult);
     await application.save();
     console.log(`Application ${id} updated with exam result for ${exam.subject}`);
-    // إرجاع رسالة نجاح فقط (بدون إظهار النتائج للطالب)
     res.json({ message: 'Exam submitted and graded successfully' });
   } catch (error) {
     console.error('Error submitting exam:', error);
@@ -396,7 +384,6 @@ app.get('/api/applications/:id/results', authenticateToken, restrictToAdminOrDep
     if (!application) {
       return res.status(404).json({ error: 'Application not found' });
     }
-    // إذا كان المستخدم DepartmentHead، إرجاع نتائج قسمه فقط
     if (req.user.role === 'DepartmentHead') {
       const departmentResults = application.exams.filter(exam => exam.subject === req.user.department);
       return res.json({
@@ -404,7 +391,6 @@ app.get('/api/applications/:id/results', authenticateToken, restrictToAdminOrDep
         results: departmentResults
       });
     }
-    // إذا كان المستخدم Admin، إرجاع كل النتائج
     res.json({
       message: 'Exam results retrieved successfully',
       results: application.exams
@@ -423,7 +409,6 @@ app.put('/api/applications/:id/mark-seen', authenticateToken, restrictToDepartme
     if (!application) {
       return res.status(404).json({ error: 'Application not found' });
     }
-    // تحديث seenByDepartmentHead للامتحانات التي تخص قسم المستخدم
     application.exams = application.exams.map(exam => {
       if (exam.subject === req.user.department && !exam.seenByDepartmentHead) {
         return { ...exam, seenByDepartmentHead: true };
@@ -443,7 +428,6 @@ app.put('/api/applications/:id/mark-seen', authenticateToken, restrictToDepartme
 app.get('/api/students', authenticateToken, restrictToRegistrar, async (req, res) => {
   try {
     const students = await Student.find().populate('applicationId').lean();
-    // إزالة حقل exams من بيانات الطلبات يدويًا
     const filteredStudents = students.map(student => {
       if (student.applicationId && student.applicationId.exams) {
         delete student.applicationId.exams;
@@ -471,34 +455,27 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     if (!exam) {
       return res.status(404).json({ error: 'Exam not found' });
     }
-    // إذا كان المستخدم DepartmentHead، يجب أن يكون الامتحان لقسمه
     if (req.user.role === 'DepartmentHead' && req.user.department !== exam.subject) {
       return res.status(403).json({ error: 'You can only edit exams for your department' });
     }
 
-    // تحويل questions من سلسلة JSON إلى كائن
     questions = questions ? JSON.parse(questions) : exam.questions;
     console.log('Received data:', { subject, division, stage, level, questions });
     console.log('Uploaded files:', req.files);
 
-    // إضافة أو تحديث الصور للأسئلة بناءً على الحقول المُرسلة
     const files = req.files || [];
-    let fileIndex = 0;
     questions.forEach((question, index) => {
-      // إذا كان هناك صورة مرفوعة جديدة لهذا السؤال
-      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
-        question.image = `/uploads/${files[fileIndex].filename}`;
+      question.order = index + 1;
+      const fileForQuestion = files.find(file => file.fieldname === `images[${index}]`);
+      if (fileForQuestion) {
+        question.image = `/uploads/${fileForQuestion.filename}`;
         console.log(`Image updated for question ${index + 1}: ${question.image}`);
-        fileIndex++;
       } else if (!question.image) {
-        // إذا لم يتم رفع صورة جديدة ولا يوجد صورة سابقة، اجعل الحقل فارغًا
         question.image = '';
         console.log(`No image for question ${index + 1}`);
       }
-      // إذا لم يتم رفع صورة جديدة ولكن يوجد صورة سابقة، يتم الاحتفاظ بالصورة السابقة (question.image)
     });
 
-    // تحديث الحقول
     if (subject) exam.subject = subject;
     exam.questions = questions;
     if (division) exam.division = division;

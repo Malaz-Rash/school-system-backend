@@ -20,8 +20,12 @@ const examSchema = new mongoose.Schema({
         required: true,
       },
       image: {
-        type: String, // سيتم تخزين رابط الصورة (مثل /uploads/filename.jpg)
+        type: String,
         default: '',
+      },
+      order: {
+        type: Number,
+        required: true,
       },
     },
   ],
