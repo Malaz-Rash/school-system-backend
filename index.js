@@ -19,9 +19,9 @@ app.use(express.json());
 
 // إعداد Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dkxynjpcx', // استبدلي بـ Cloud Name الخاص بكِ
-  api_key: process.env.CLOUDINARY_API_KEY || '329562837845542', // استبدلي بـ API Key الخاص بكِ
-  api_secret: process.env.CLOUDINARY_API_SECRET || '21GdJoDNlK9pVBZJYgTH5Vqs3V0', // استبدلي بـ API Secret الخاص بكِ
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dkxynjpcx',
+  api_key: process.env.CLOUDINARY_API_KEY || '329562837845542',
+  api_secret: process.env.CLOUDINARY_API_SECRET || '21GdJoDNlK9pVBZJYgTH5Vqs3V0',
 });
 
 // إعداد multer لرفع الصور إلى Cloudinary
@@ -147,10 +147,12 @@ app.post('/api/students', authenticateToken, async (req, res) => {
 // API لتسجيل طالب من قبل ولي الأمر (مفتوح)
 app.post('/api/parent-register-student', async (req, res) => {
   try {
-    const { name, division, stage, level } = req.body;
+    const { fullNameEn, division, stage, level } = req.body;
+    // استخدام fullNameEn كـ name إذا لم يكن name موجودًا
+    const name = fullNameEn;
     if (!name) {
       console.log('Student name is missing in request body:', req.body);
-      return res.status(400).json({ error: 'Student name is required' });
+      return res.status(400).json({ error: 'Student name (fullNameEn) is required' });
     }
     const student = new Student({ name, division, stage, level });
     await student.save();
@@ -283,8 +285,7 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.any()
       const match = file.fieldname.match(/^images\[(\d+)\]$/);
       if (match) {
         const index = parseInt(match[1]);
-        // استخدام URL الصورة من Cloudinary مباشرة
-        imageMap[index] = file.path; // file.path هو URL الصورة على Cloudinary
+        imageMap[index] = file.path;
         console.log(`Image mapped for question ${index + 1}: ${imageMap[index]}`);
       }
     });
