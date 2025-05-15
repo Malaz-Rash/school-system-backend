@@ -241,7 +241,7 @@ app.get('/api/applications/:id', authenticateToken, restrictToAdminOrDepartmentH
 app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array('images'), async (req, res) => {
   console.log('Received POST request to /api/exams');
   try {
-    const { subject, division, stage, level } = req.body;
+    const { subject, division, stage, level, imageIndices } = req.body;
     const questions = req.body.questions ? JSON.parse(req.body.questions) : [];
 
     console.log('User data from token:', req.user);
@@ -264,13 +264,15 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    // إنشاء قاموس لربط الصور بموقع السؤال بناءً على الـ fieldname
+    const indices = imageIndices ? JSON.parse(imageIndices) : [];
+
+    console.log('Image indices:', indices);
+
+    // إنشاء قاموس لربط الصور بموقع السؤال بناءً على الـ indices
     const imageMap = {};
-    files.forEach(file => {
-      const match = file.fieldname.match(/^images\[(\d+)\]$/);
-      if (match) {
-        const index = parseInt(match[1]);
-        imageMap[index] = `/uploads/${file.filename}`;
+    indices.forEach((index, i) => {
+      if (files[i]) {
+        imageMap[index] = `/uploads/${files[i].filename}`;
       }
     });
 
@@ -466,7 +468,7 @@ app.get('/api/students', authenticateToken, restrictToRegistrar, async (req, res
 // API لتعديل امتحان موجود (محمي بـ JWT، مقيد بـ Admin أو DepartmentHead)
 app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, upload.array('images'), async (req, res) => {
   const { id } = req.params;
-  let { subject, questions, division, stage, level } = req.body;
+  let { subject, questions, division, stage, level, imageIndices } = req.body;
 
   try {
     const exam = await Exam.findById(id);
@@ -482,12 +484,14 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
+    const indices = imageIndices ? JSON.parse(imageIndices) : [];
+
+    console.log('Image indices:', indices);
+
     const imageMap = {};
-    files.forEach(file => {
-      const match = file.fieldname.match(/^images\[(\d+)\]$/);
-      if (match) {
-        const index = parseInt(match[1]);
-        imageMap[index] = `/uploads/${file.filename}`;
+    indices.forEach((index, i) => {
+      if (files[i]) {
+        imageMap[index] = `/uploads/${files[i].filename}`;
       }
     });
 
