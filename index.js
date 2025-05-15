@@ -4,7 +4,8 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const path = require('path');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const User = require('./models/User');
 const Student = require('./models/Student');
 const Application = require('./models/Application');
@@ -16,21 +17,23 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
-// إعداد multer لتخزين الصور في مجلد uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+// إعداد Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dkxynjpcx', // استبدلي بـ Cloud Name الخاص بكِ
+  api_key: process.env.CLOUDINARY_API_KEY || '329562837845542', // استبدلي بـ API Key الخاص بكِ
+  api_secret: process.env.CLOUDINARY_API_SECRET || '21GdJoDNlK9pVBZJYgTH5Vqs3V0', // استبدلي بـ API Secret الخاص بكِ
+});
+
+// إعداد multer لرفع الصور إلى Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'school-system-uploads',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'gif'],
   },
 });
 
 const upload = multer({ storage: storage });
-
-// جعل مجلد uploads متاحًا للوصول إلى الصور
-app.use('/uploads', express.static('uploads'));
 
 // الاتصال بـ MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost/school-system';
@@ -144,15 +147,20 @@ app.post('/api/students', authenticateToken, async (req, res) => {
 // API لتسجيل طالب من قبل ولي الأمر (مفتوح)
 app.post('/api/parent-register-student', async (req, res) => {
   try {
-    const student = new Student(req.body);
+    const { name, division, stage, level } = req.body;
+    if (!name) {
+      console.log('Student name is missing in request body:', req.body);
+      return res.status(400).json({ error: 'Student name is required' });
+    }
+    const student = new Student({ name, division, stage, level });
     await student.save();
     console.log(`Student created successfully with ID: ${student._id}`);
 
     const application = new Application({ 
       studentId: student._id,
-      division: req.body.division,
-      stage: req.body.stage,
-      level: req.body.level
+      division,
+      stage,
+      level
     });
     await application.save();
     console.log(`Application created successfully with ID: ${application._id}`);
@@ -222,7 +230,6 @@ app.get('/api/applications', authenticateToken, restrictToAdminOrDepartmentHead,
 app.get('/api/applications/:id', authenticateToken, restrictToAdminOrDepartmentHead, async (req, res) => {
   const { id } = req.params;
 
-  // التحقق من أن الـ id صالح (ليس undefined ويطابق تنسيق ObjectId)
   if (!id || !mongoose.Types.ObjectId.isValid(id)) {
     console.log(`Invalid application ID: ${id}`);
     return res.status(400).json({ error: 'Invalid application ID' });
@@ -276,7 +283,8 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.any()
       const match = file.fieldname.match(/^images\[(\d+)\]$/);
       if (match) {
         const index = parseInt(match[1]);
-        imageMap[index] = `/uploads/${file.filename}`;
+        // استخدام URL الصورة من Cloudinary مباشرة
+        imageMap[index] = file.path; // file.path هو URL الصورة على Cloudinary
         console.log(`Image mapped for question ${index + 1}: ${imageMap[index]}`);
       }
     });
@@ -382,7 +390,7 @@ app.post('/api/applications/:id/submit-exam', async (req, res) => {
       };
     });
     console.log('Results after processing:', results);
-    const percentageScore = Math.round((score / totalQuestions) * 100); // تقريب النسبة إلى عدد صحيح
+    const percentageScore = Math.round((score / totalQuestions) * 100);
     const examResult = {
       subject: exam.subject,
       score: percentageScore,
@@ -494,7 +502,7 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
       const match = file.fieldname.match(/^images\[(\d+)\]$/);
       if (match) {
         const index = parseInt(match[1]);
-        imageMap[index] = `/uploads/${file.filename}`;
+        imageMap[index] = file.path;
         console.log(`Image mapped for question ${index + 1}: ${imageMap[index]}`);
       }
     });
