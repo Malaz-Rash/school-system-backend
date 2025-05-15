@@ -221,6 +221,13 @@ app.get('/api/applications', authenticateToken, restrictToAdminOrDepartmentHead,
 // API لجلب طلب فردي بناءً على المعرف (محمي بـ JWT، متاح لـ Admin و DepartmentHead)
 app.get('/api/applications/:id', authenticateToken, restrictToAdminOrDepartmentHead, async (req, res) => {
   const { id } = req.params;
+
+  // التحقق من أن الـ id صالح (ليس undefined ويطابق تنسيق ObjectId)
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    console.log(`Invalid application ID: ${id}`);
+    return res.status(400).json({ error: 'Invalid application ID' });
+  }
+
   try {
     const application = await Application.findById(id).populate('studentId').lean();
     if (!application) {
@@ -375,7 +382,7 @@ app.post('/api/applications/:id/submit-exam', async (req, res) => {
       };
     });
     console.log('Results after processing:', results);
-    const percentageScore = (score / totalQuestions) * 100;
+    const percentageScore = Math.round((score / totalQuestions) * 100); // تقريب النسبة إلى عدد صحيح
     const examResult = {
       subject: exam.subject,
       score: percentageScore,
