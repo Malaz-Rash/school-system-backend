@@ -1,18 +1,19 @@
 const mongoose = require('mongoose');
 
 const studentSchema = new mongoose.Schema({
-  fullNameAr: { type: String, required: true },
-  fullNameEn: { type: String, required: true },
-  nationalId: { type: String, required: true },
-  birthDate: { type: Date, required: true },
-  passportNumber: { type: String, required: true },
-  nationality: { type: String, required: true },
-  previousSchool: { type: String },
-  fatherNationalId: { type: String, required: true },
-  fatherPhone: { type: String, required: true },
-  motherPhone: { type: String, required: true },
-  fatherJob: { type: String, required: true },
-  fatherWorkplace: { type: String, required: true },
+  name: { type: String, required: true }, // حقل name مطلوب
+  fullNameAr: { type: String }, // اختياري
+  fullNameEn: { type: String }, // اختياري
+  nationalId: { type: String }, // اختياري
+  birthDate: { type: Date }, // اختياري
+  passportNumber: { type: String }, // اختياري
+  nationality: { type: String }, // اختياري
+  previousSchool: { type: String }, // اختياري
+  fatherNationalId: { type: String }, // اختياري
+  fatherPhone: { type: String }, // اختياري
+  motherPhone: { type: String }, // اختياري
+  fatherJob: { type: String }, // اختياري
+  fatherWorkplace: { type: String }, // اختياري
   division: { type: String, enum: ['American', 'British'], required: true },
   stage: { type: String, required: true },
   level: { type: String, required: true },

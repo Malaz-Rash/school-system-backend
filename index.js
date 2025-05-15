@@ -147,22 +147,57 @@ app.post('/api/students', authenticateToken, async (req, res) => {
 // API لتسجيل طالب من قبل ولي الأمر (مفتوح)
 app.post('/api/parent-register-student', async (req, res) => {
   try {
-    const { fullNameEn, division, stage, level } = req.body;
-    // استخدام fullNameEn كـ name إذا لم يكن name موجودًا
-    const name = fullNameEn;
+    const {
+      name,
+      fullNameAr,
+      fullNameEn,
+      nationalId,
+      birthDate,
+      passportNumber,
+      nationality,
+      previousSchool,
+      fatherNationalId,
+      fatherPhone,
+      motherPhone,
+      fatherJob,
+      fatherWorkplace,
+      division,
+      stage,
+      level,
+    } = req.body;
+
     if (!name) {
       console.log('Student name is missing in request body:', req.body);
-      return res.status(400).json({ error: 'Student name (fullNameEn) is required' });
+      return res.status(400).json({ error: 'Student name is required' });
     }
-    const student = new Student({ name, division, stage, level });
+
+    const student = new Student({
+      name,
+      fullNameAr,
+      fullNameEn,
+      nationalId,
+      birthDate,
+      passportNumber,
+      nationality,
+      previousSchool,
+      fatherNationalId,
+      fatherPhone,
+      motherPhone,
+      fatherJob,
+      fatherWorkplace,
+      division,
+      stage,
+      level,
+    });
+
     await student.save();
     console.log(`Student created successfully with ID: ${student._id}`);
 
-    const application = new Application({ 
+    const application = new Application({
       studentId: student._id,
       division,
       stage,
-      level
+      level,
     });
     await application.save();
     console.log(`Application created successfully with ID: ${application._id}`);
