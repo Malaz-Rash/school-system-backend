@@ -238,10 +238,10 @@ app.get('/api/applications/:id', authenticateToken, restrictToAdminOrDepartmentH
 });
 
 // API لإنشاء امتحان جديد (محمي بـ JWT، مقيد بـ DepartmentHead)
-app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array('images'), async (req, res) => {
+app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.any(), async (req, res) => {
   console.log('Received POST request to /api/exams');
   try {
-    const { subject, division, stage, level, imageIndices } = req.body;
+    const { subject, division, stage, level } = req.body;
     const questions = req.body.questions ? JSON.parse(req.body.questions) : [];
 
     console.log('User data from token:', req.user);
@@ -264,23 +264,21 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    const indices = imageIndices ? JSON.parse(imageIndices) : [];
-
-    console.log('Image indices:', indices);
-
-    // إنشاء قاموس لربط الصور بموقع السؤال بناءً على الـ indices
     const imageMap = {};
-    indices.forEach((index, i) => {
-      if (files[i]) {
-        imageMap[index] = `/uploads/${files[i].filename}`;
+    files.forEach(file => {
+      const match = file.fieldname.match(/^images\[(\d+)\]$/);
+      if (match) {
+        const index = parseInt(match[1]);
+        imageMap[index] = `/uploads/${file.filename}`;
+        console.log(`Image mapped for question ${index + 1}: ${imageMap[index]}`);
       }
     });
 
-    console.log('Image map:', imageMap);
+    console.log('Final image map:', imageMap);
 
     questions.forEach((question, index) => {
-      question.order = index + 1; // إضافة الترتيب
-      if (imageMap[index]) {
+      question.order = index + 1;
+      if (imageMap[index] !== undefined) {
         question.image = imageMap[index];
         console.log(`Image added to question ${index + 1}: ${question.image}`);
       } else {
@@ -466,9 +464,9 @@ app.get('/api/students', authenticateToken, restrictToRegistrar, async (req, res
 });
 
 // API لتعديل امتحان موجود (محمي بـ JWT، مقيد بـ Admin أو DepartmentHead)
-app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, upload.array('images'), async (req, res) => {
+app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, upload.any(), async (req, res) => {
   const { id } = req.params;
-  let { subject, questions, division, stage, level, imageIndices } = req.body;
+  let { subject, questions, division, stage, level } = req.body;
 
   try {
     const exam = await Exam.findById(id);
@@ -484,22 +482,21 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    const indices = imageIndices ? JSON.parse(imageIndices) : [];
-
-    console.log('Image indices:', indices);
-
     const imageMap = {};
-    indices.forEach((index, i) => {
-      if (files[i]) {
-        imageMap[index] = `/uploads/${files[i].filename}`;
+    files.forEach(file => {
+      const match = file.fieldname.match(/^images\[(\d+)\]$/);
+      if (match) {
+        const index = parseInt(match[1]);
+        imageMap[index] = `/uploads/${file.filename}`;
+        console.log(`Image mapped for question ${index + 1}: ${imageMap[index]}`);
       }
     });
 
-    console.log('Image map:', imageMap);
+    console.log('Final image map:', imageMap);
 
     questions.forEach((question, index) => {
       question.order = index + 1;
-      if (imageMap[index]) {
+      if (imageMap[index] !== undefined) {
         question.image = imageMap[index];
         console.log(`Image updated for question ${index + 1}: ${question.image}`);
       } else if (!question.image) {
