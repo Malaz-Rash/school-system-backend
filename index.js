@@ -264,13 +264,23 @@ app.post('/api/exams', authenticateToken, restrictToDepartmentHead, upload.array
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    let fileIndex = 0;
+    // إنشاء قاموس لربط الصور بموقع السؤال بناءً على الـ fieldname
+    const imageMap = {};
+    files.forEach(file => {
+      const match = file.fieldname.match(/^images\[(\d+)\]$/);
+      if (match) {
+        const index = parseInt(match[1]);
+        imageMap[index] = `/uploads/${file.filename}`;
+      }
+    });
+
+    console.log('Image map:', imageMap);
+
     questions.forEach((question, index) => {
       question.order = index + 1; // إضافة الترتيب
-      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
-        question.image = `/uploads/${files[fileIndex].filename}`;
+      if (imageMap[index]) {
+        question.image = imageMap[index];
         console.log(`Image added to question ${index + 1}: ${question.image}`);
-        fileIndex++;
       } else {
         question.image = '';
         console.log(`No image for question ${index + 1}`);
@@ -472,13 +482,22 @@ app.put('/api/exams/:id', authenticateToken, restrictToAdminOrDepartmentHead, up
     console.log('Uploaded files:', req.files);
 
     const files = req.files || [];
-    let fileIndex = 0;
+    const imageMap = {};
+    files.forEach(file => {
+      const match = file.fieldname.match(/^images\[(\d+)\]$/);
+      if (match) {
+        const index = parseInt(match[1]);
+        imageMap[index] = `/uploads/${file.filename}`;
+      }
+    });
+
+    console.log('Image map:', imageMap);
+
     questions.forEach((question, index) => {
       question.order = index + 1;
-      if (files[fileIndex] && files[fileIndex].fieldname === 'images') {
-        question.image = `/uploads/${files[fileIndex].filename}`;
+      if (imageMap[index]) {
+        question.image = imageMap[index];
         console.log(`Image updated for question ${index + 1}: ${question.image}`);
-        fileIndex++;
       } else if (!question.image) {
         question.image = '';
         console.log(`No image for question ${index + 1}`);
