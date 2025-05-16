@@ -121,13 +121,45 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role, department: user.department, division: user.division },
       'secret',
-      { expiresIn: '24h' } // تمديد صلاحية الـ token إلى 24 ساعة
+      { expiresIn: '1h' } // الـ token الأساسي صالح لمدة ساعة
+    );
+    const refreshToken = jwt.sign(
+      { id: user._id, role: user.role, department: user.department, division: user.division },
+      'secret',
+      { expiresIn: '7d' } // الـ refresh token صالح لمدة 7 أيام
     );
     console.log(`User ${username} logged in successfully`);
-    res.json({ token, role: user.role, department: user.department, division: user.division });
+    res.json({ token, refreshToken, role: user.role, department: user.department, division: user.division });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// API لتحديث الـ token
+app.post('/api/refresh-token', async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Refresh token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, 'secret');
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newToken = jwt.sign(
+      { id: user._id, role: user.role, department: user.department, division: user.division },
+      'secret',
+      { expiresIn: '1h' }
+    );
+    console.log(`Token refreshed for user ${user.username}`);
+    res.json({ token: newToken });
+  } catch (error) {
+    console.error('Error refreshing token:', error.message);
+    res.status(403).json({ error: 'Invalid refresh token' });
   }
 });
 
@@ -147,20 +179,57 @@ app.post('/api/students', authenticateToken, async (req, res) => {
 // API لتسجيل طالب من قبل ولي الأمر (مفتوح)
 app.post('/api/parent-register-student', async (req, res) => {
   try {
-    const { name, fullNameAr, fullNameEn, nationalId, birthDate, passportNumber, nationality, previousSchool, fatherNationalId, fatherPhone, motherPhone, fatherJob, fatherWorkplace, division, stage, level } = req.body;
+    const {
+      name,
+      fullNameAr,
+      fullNameEn,
+      nationalId,
+      birthDate,
+      passportNumber,
+      nationality,
+      previousSchool,
+      fatherNationalId,
+      fatherPhone,
+      motherPhone,
+      fatherJob,
+      fatherWorkplace,
+      division,
+      stage,
+      level,
+    } = req.body;
+
     if (!name) {
       console.log('Student name is missing in request body:', req.body);
-      return res.status(400).json({ error: 'Student name (fullNameEn) is required' });
+      return res.status(400).json({ error: 'Student name is required' });
     }
-    const student = new Student({ name, fullNameAr, fullNameEn, nationalId, birthDate, passportNumber, nationality, previousSchool, fatherNationalId, fatherPhone, motherPhone, fatherJob, fatherWorkplace, division, stage, level });
+
+    const student = new Student({
+      name,
+      fullNameAr,
+      fullNameEn,
+      nationalId,
+      birthDate,
+      passportNumber,
+      nationality,
+      previousSchool,
+      fatherNationalId,
+      fatherPhone,
+      motherPhone,
+      fatherJob,
+      fatherWorkplace,
+      division,
+      stage,
+      level,
+    });
+
     await student.save();
     console.log(`Student created successfully with ID: ${student._id}`);
 
-    const application = new Application({ 
+    const application = new Application({
       studentId: student._id,
       division,
       stage,
-      level
+      level,
     });
     await application.save();
     console.log(`Application created successfully with ID: ${application._id}`);
