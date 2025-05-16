@@ -121,7 +121,7 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role, department: user.department, division: user.division },
       'secret',
-      { expiresIn: '1h' }
+      { expiresIn: '24h' } // تمديد صلاحية الـ token إلى 24 ساعة
     );
     console.log(`User ${username} logged in successfully`);
     res.json({ token, role: user.role, department: user.department, division: user.division });
@@ -147,57 +147,20 @@ app.post('/api/students', authenticateToken, async (req, res) => {
 // API لتسجيل طالب من قبل ولي الأمر (مفتوح)
 app.post('/api/parent-register-student', async (req, res) => {
   try {
-    const {
-      name,
-      fullNameAr,
-      fullNameEn,
-      nationalId,
-      birthDate,
-      passportNumber,
-      nationality,
-      previousSchool,
-      fatherNationalId,
-      fatherPhone,
-      motherPhone,
-      fatherJob,
-      fatherWorkplace,
-      division,
-      stage,
-      level,
-    } = req.body;
-
+    const { name, fullNameAr, fullNameEn, nationalId, birthDate, passportNumber, nationality, previousSchool, fatherNationalId, fatherPhone, motherPhone, fatherJob, fatherWorkplace, division, stage, level } = req.body;
     if (!name) {
       console.log('Student name is missing in request body:', req.body);
-      return res.status(400).json({ error: 'Student name is required' });
+      return res.status(400).json({ error: 'Student name (fullNameEn) is required' });
     }
-
-    const student = new Student({
-      name,
-      fullNameAr,
-      fullNameEn,
-      nationalId,
-      birthDate,
-      passportNumber,
-      nationality,
-      previousSchool,
-      fatherNationalId,
-      fatherPhone,
-      motherPhone,
-      fatherJob,
-      fatherWorkplace,
-      division,
-      stage,
-      level,
-    });
-
+    const student = new Student({ name, fullNameAr, fullNameEn, nationalId, birthDate, passportNumber, nationality, previousSchool, fatherNationalId, fatherPhone, motherPhone, fatherJob, fatherWorkplace, division, stage, level });
     await student.save();
     console.log(`Student created successfully with ID: ${student._id}`);
 
-    const application = new Application({
+    const application = new Application({ 
       studentId: student._id,
       division,
       stage,
-      level,
+      level
     });
     await application.save();
     console.log(`Application created successfully with ID: ${application._id}`);
